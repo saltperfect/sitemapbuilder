@@ -36,9 +36,8 @@ func main() {
 	for _, link := range links {
 		urls = append(urls, loc{Value: link})
 	}
-
 	urlSet := urlSet{
-		Urls: urls,
+		Urls:  urls,
 		UrlNs: xmlAttr,
 	}
 	enc := xml.NewEncoder(os.Stdout)
