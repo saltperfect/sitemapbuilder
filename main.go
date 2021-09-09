@@ -1,11 +1,13 @@
 package main
 
 import (
+	"encoding/xml"
 	"flag"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	link "github.com/saltperfect/linkparser"
@@ -14,15 +16,38 @@ import (
 /*
 	1.
 */
+const xmlAttr string = "www.hello.com"
+
+type loc struct {
+	Value string `xml:"loc"`
+}
+
+type urlSet struct {
+	Urls  []loc  `xml:"url"`
+	UrlNs string `xml:"xmlns,attr"`
+}
 
 func main() {
 	targetUrl := flag.String("url", "https://gophercises.com", "target url whose sitemap needs to be made")
-	maxDepth := flag.Int("maxDepth", 3, "maximum depth to to which you need to traverse")
+	maxDepth := flag.Int("maxDepth", 5, "maximum depth to to which you need to traverse")
 	flag.Parse()
 	links := bfs(*targetUrl, *maxDepth)
-	for _, v := range links {
-		fmt.Printf("%s\n", v)
+	var urls []loc
+	for _, link := range links {
+		urls = append(urls, loc{Value: link})
 	}
+
+	urlSet := urlSet{
+		Urls: urls,
+		UrlNs: xmlAttr,
+	}
+	enc := xml.NewEncoder(os.Stdout)
+	enc.Indent("", "  ")
+	err := enc.Encode(urlSet)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println()
 }
 
 func bfs(urlStr string, maxDepth int) []string {
@@ -31,21 +56,24 @@ func bfs(urlStr string, maxDepth int) []string {
 	nq := map[string]struct{}{
 		urlStr: {},
 	}
-	for i := 0; i <= maxDepth; i++ {
+	for i := 0; i < maxDepth; i++ {
 		q, nq = nq, make(map[string]struct{})
-		for url, _ := range q {
-			go func (url string) {
-				if _, ok := seen[url]; !ok {
-					seen[url] = struct{}{}
-					for _, link := range get(url) {
+		if len(q) == 0 {
+			break
+		}
+		for url := range q {
+			if _, ok := seen[url]; !ok {
+				seen[url] = struct{}{}
+				for _, link := range get(url) {
+					if _, ok := seen[link]; !ok {
 						nq[link] = struct{}{}
 					}
 				}
-			}(url)
+			}
 		}
 	}
 	ret := make([]string, 0, len(seen))
-	for url, _ := range seen {
+	for url := range seen {
 		ret = append(ret, url)
 	}
 	return ret
